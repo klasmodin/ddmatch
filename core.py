@@ -289,6 +289,36 @@ def generate_optimized_divergence(image):
 
 	return divergence_2d
 
+def generate_optimized_jacobian(image):
+	s = image.shape[0]
+	if (len(image.shape) != 2):
+		raise(NotImplementedError('Only 2d images are allowed so far.'))
+	if (image.shape[1] != s):
+		raise(NotImplementedError('Only square images are allowed so far.'))
+	if (image.dtype != np.float64):
+		raise(NotImplementedError('Only float64 images are allowed so far.'))
+
+	@numba.njit('f8(f8,f8,f8,f8)')
+	def det_2d(a11,a21,a12,a22):
+		return a12*a21-a11*a22 
+
+	@numba.njit('void(f8[:,:],f8[:,:],f8[:,:])')
+	def jacobian_2d(xphi,yphi,jac):
+		for i in range(s-1):
+			for j in range(s-1):
+				jac[i,j] = det_2d(xphi[i+1,j]-xphi[i,j],yphi[i+1,j]-yphi[i,j],\
+								xphi[i,j+1]-xphi[i,j],yphi[i,j+1]-yphi[i,j])
+			jac[i,s-1] = det_2d(xphi[i+1,s-1]-xphi[i,s-1],yphi[i+1,s-1]-yphi[i,s-1],\
+							xphi[i,0]+s-xphi[i,s-1],yphi[i,0]+s-yphi[i,s-1])
+		for j in range(s-1):
+			jac[s-1,j] = det_2d(xphi[0,j]+s-xphi[s-1,j],yphi[0,j]+s-yphi[s-1,j],\
+							xphi[s-1,j+1]-xphi[s-1,j],yphi[s-1,j+1]-yphi[s-1,j])
+		jac[s-1,s-1] = det_2d(xphi[0,s-1]-xphi[s-1,s-1],yphi[0,s-1]+s-yphi[s-1,s-1],\
+						xphi[s-1,0]+s-xphi[s-1,s-1],yphi[s-1,0]-yphi[s-1,s-1])
+
+	return jacobian_2d
+
+
 def generate_optimized_density_match_L2_gradient(image):
 	s = image.shape[0]
 	if (len(image.shape) != 2):
