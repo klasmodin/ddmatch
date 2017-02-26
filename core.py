@@ -652,6 +652,7 @@ class TwoComponentDensityMatching(object):
 		self.divergence = generate_optimized_divergence(I1)
 		self.density_match_L2_gradient = generate_optimized_density_match_L2_gradient(I1)
 		self.evaluate = generate_optimized_diffeo_evaluation(I1)
+		self.jacobian = generate_optimized_jacobian_forward(I1)
 
 		# Allocate and initialize variables
 		self.sigma = sigma
@@ -699,7 +700,7 @@ class TwoComponentDensityMatching(object):
 		self.Linv[0,0] = 1.
 
 		
-	def run(self, niter=300, epsilon=0.1, yielditer=False):
+	def run(self, niter=300, epsilon=0.1, yielditer=False, use_exact_jac=False):
 		"""
 		Carry out the matching process.
 
@@ -798,12 +799,15 @@ class TwoComponentDensityMatching(object):
 
 			
 			# STEP 6
-			self.image_compose(self.J, self.psiinvx, self.psiinvy, self.sqrtJ)
-			np.copyto(self.J, self.sqrtJ)
-			self.divergence(self.vx, self.vy, self.divv)
-			self.divv *= -epsilon
-			np.exp(self.divv, out=self.sqrtJ)
-			self.J *= self.sqrtJ
+			if use_exact_jac:
+				self.jacobian(self.phiinvx,self.phiinvy,self.J)
+			else:
+				self.image_compose(self.J, self.psiinvx, self.psiinvy, self.sqrtJ)
+				np.copyto(self.J, self.sqrtJ)
+				self.divergence(self.vx, self.vy, self.divv)
+				self.divv *= -epsilon
+				np.exp(self.divv, out=self.sqrtJ)
+				self.J *= self.sqrtJ
 			np.sqrt(self.J, out=self.sqrtJ)
 
 
