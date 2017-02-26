@@ -289,7 +289,7 @@ def generate_optimized_divergence(image):
 
 	return divergence_2d
 
-def generate_optimized_jacobian(image):
+def generate_optimized_jacobian_forward(image):
 	s = image.shape[0]
 	if (len(image.shape) != 2):
 		raise(NotImplementedError('Only 2d images are allowed so far.'))
@@ -300,23 +300,41 @@ def generate_optimized_jacobian(image):
 
 	@numba.njit('f8(f8,f8,f8,f8)')
 	def det_2d(a11,a21,a12,a22):
-		return a12*a21-a11*a22 
+		return a11*a22 - a12*a21
 
 	@numba.njit('void(f8[:,:],f8[:,:],f8[:,:])')
-	def jacobian_2d(xphi,yphi,jac):
+	def jacobian_2d_forward(xphi,yphi,jac):
 		for i in range(s-1):
 			for j in range(s-1):
-				jac[i,j] = det_2d(xphi[i+1,j]-xphi[i,j],yphi[i+1,j]-yphi[i,j],\
-								xphi[i,j+1]-xphi[i,j],yphi[i,j+1]-yphi[i,j])
-			jac[i,s-1] = det_2d(xphi[i+1,s-1]-xphi[i,s-1],yphi[i+1,s-1]-yphi[i,s-1],\
-							xphi[i,0]+s-xphi[i,s-1],yphi[i,0]-yphi[i,s-1])
-		for j in range(s-1):
-			jac[s-1,j] = det_2d(xphi[0,j]-xphi[s-1,j],yphi[0,j]+s-yphi[s-1,j],\
-							xphi[s-1,j+1]-xphi[s-1,j],yphi[s-1,j+1]-yphi[s-1,j])
-		jac[s-1,s-1] = det_2d(xphi[0,s-1]-xphi[s-1,s-1],yphi[0,s-1]+s-yphi[s-1,s-1],\
-						xphi[s-1,0]+s-xphi[s-1,s-1],yphi[s-1,0]-yphi[s-1,s-1])
+				dxphi_dx = xphi[i,j+1]-xphi[i,j]
+				dxphi_dy = xphi[i+1,j]-xphi[i,j]
+				dyphi_dx = yphi[i,j+1]-yphi[i,j]
+				dyphi_dy = yphi[i+1,j]-yphi[i,j]
+				jac[i,j] = det_2d(dxphi_dx,dyphi_dx,\
+								  dxphi_dy,dyphi_dy)
 
-	return jacobian_2d
+			dxphi_dx = xphi[i,0]+s-xphi[i,s-1]
+			dxphi_dy = xphi[i+1,s-1]-xphi[i,s-1]
+			dyphi_dx = yphi[i,0]-yphi[i,s-1]
+			dyphi_dy = yphi[i+1,s-1]-yphi[i,s-1]
+			jac[i,s-1] = det_2d(dxphi_dx,dyphi_dx,\
+							  dxphi_dy,dyphi_dy)
+		for j in range(s-1):
+			dxphi_dx = xphi[s-1,j+1]-xphi[s-1,j]
+			dxphi_dy = xphi[0,j]-xphi[s-1,j]
+			dyphi_dx = yphi[s-1,j+1]-yphi[s-1,j]
+			dyphi_dy = yphi[0,j]+s-yphi[s-1,j]
+			jac[s-1,j] = det_2d(dxphi_dx,dyphi_dx,\
+							  dxphi_dy,dyphi_dy)
+
+		dxphi_dx = xphi[s-1,0]+s-xphi[s-1,s-1]
+		dxphi_dy = xphi[0,s-1]-xphi[s-1,s-1]
+		dyphi_dx = yphi[s-1,0]-yphi[s-1,s-1]
+		dyphi_dy = yphi[0,s-1]+s-yphi[s-1,s-1]
+		jac[s-1,s-1] = det_2d(dxphi_dx,dyphi_dx,\
+						  dxphi_dy,dyphi_dy)
+
+	return jacobian_2d_forward
 
 
 def generate_optimized_density_match_L2_gradient(image):
