@@ -258,6 +258,40 @@ def generate_optimized_image_gradient(image):
 
 	return image_gradient_2d
 
+def generate_optimized_image_gradient_forward(image):
+	s = image.shape[0]
+	if (len(image.shape) != 2):
+		raise(NotImplementedError('Only 2d images are allowed so far.'))
+	if (image.shape[1] != s):
+		raise(NotImplementedError('Only square images are allowed so far.'))
+	if (image.dtype != np.float64):
+		raise(NotImplementedError('Only float64 images are allowed so far.'))
+
+	@numba.njit('void(f8[:,:],f8[:,:],f8[:,:])')
+	def image_gradient_2d_forward(I,dIdx,dIdy):
+		im1 = s-1
+		jm1 = s-1
+		for i in range(s-1):
+			ip1 = i+1
+			for j in range(s-1):
+				jp1 = j+1
+				dIdy[i,j] = (I[ip1,j]-I[im1,j])/2.0
+				dIdx[i,j] = (I[i,jp1]-I[i,jm1])/2.0
+				jm1 = j
+			dIdy[i,s-1] = (I[ip1,s-1]-I[im1,s-1])/2.0
+			dIdx[i,s-1] = (I[i,0]-I[i,s-2])/2.0
+			jm1 = s-1
+			im1 = i
+		for j in range(s-1):
+			jp1 = j+1
+			dIdy[s-1,j] = (I[0,j]-I[im1,j])/2.0
+			dIdx[s-1,j] = (I[s-1,jp1]-I[s-1,jm1])/2.0
+			jm1 = j
+		dIdy[s-1,s-1] = (I[0,s-1]-I[s-2,s-1])/2.0
+		dIdx[s-1,s-1] = (I[s-1,0]-I[s-1,s-2])/2.0
+
+	return image_gradient_2d_forward
+
 
 def generate_optimized_divergence(image):
 	s = image.shape[0]
@@ -792,7 +826,8 @@ class TwoComponentDensityMatching(object):
 			np.copyto(self.phiinvx, self.tmpx)
 			np.copyto(self.phiinvy, self.tmpy)
 			if self.compute_phi: # Compute forward phi also (only for output purposes)
-				self.diffeo_compose(self.phix, self.phiy, self.psix, self.psiy, \
+				self.diffeo_compose(self.psix, self.psiy, \
+									self.phix, self.phiy, \
 									self.tmpx, self.tmpy)
 				np.copyto(self.phix, self.tmpx)
 				np.copyto(self.phiy, self.tmpy)
